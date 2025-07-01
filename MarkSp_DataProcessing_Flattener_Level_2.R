@@ -2,11 +2,10 @@
 ##REMEMBER - DO NOT OPEN THE SPREADSHEET AFTER DOWNLOAD, DRAG IT TO THE FILE FOLDER AND RUN THE CODE! 
 rm(list = ls())
 ###### REMEMBER TO CHANGE THE DIRECTORY #############
-
-setwd("/Users/jcao22/Library/CloudStorage/GoogleDrive-souketu@gmail.com/My Drive/WORK_NCSU/Research_NCSU_active/FISHstory_Materials_Jie/Zooniverse/Alex_Files/Fishstory/Zooniverse_Results")
+#setwd("/Users/jcao22/Library/CloudStorage/GoogleDrive-souketu@gmail.com/My Drive/WORK_NCSU/Research_NCSU_active/FISHstory_Materials_Jie/Zooniverse/Alex_Files/Fishstory/Zooniverse_Results")
 
 #devtools::install_github("sailthru/tidyjson")
-librarian::shelf(tidyjson,magrittr,jsonlite,dplyr,stringr,tidyr,roperators,lubridate,ggplot2)
+librarian::shelf(tidyjson,magrittr,jsonlite,dplyr,stringr,tidyr,roperators,lubridate,ggplot2,reshape2)
 
 source("Zoo_Functions.R")
 
@@ -27,8 +26,8 @@ dat1 <- markdata %>% filter(., workflow_id == 25162)
 dat2 <- dat1 %>% filter(., workflow_version == 42.92) # created after 2024-07-09 23:11:08 UTC
 
 # Check to make sure you have the right workflow.
-check_workflow(dat2)
-View_json(dat2, length(dat2$annotations))
+#check_workflow(dat2)
+#View_json(dat2, length(dat2$annotations))
 
 # Grab the top-level info for ALL classifications
 # produces one row per classification per subject; final column indicates how many x-y coordinates were made in that classification.
@@ -125,8 +124,6 @@ datameltedtar <- datameltedtar %>%
 positive_data <- cleaned_data %>% 
   filter(!is.na(tool_label))
 
-#write.csv(x = positive_data, file = "FISHstoryZooData_marksp_flattened_positives_level2_6/24/25.csv")
-
 ########################################################################
 # output sailfish photo ids
 #sailfish_photo_list <- positive_data %>%
@@ -145,14 +142,15 @@ users_per_photo <- datameltedtar %>%
   distinct() %>%
   group_by(subject_ids) %>%
   summarise(n_users = n())
-
 range(users_per_photo$n_users)
 
+# check photo-user-species combination data, see duplicates with different class_id
 datameltedtar %>%
   group_by(user_name, subject_ids) %>%
   filter(n() != 3) %>%
   arrange(user_name, subject_ids)
 
+# how many affected photos (duplications with different class_id)
 datameltedtar %>%
   group_by(user_name, subject_ids) %>%
   filter(n() != 3) %>%
@@ -161,7 +159,16 @@ datameltedtar %>%
   group_by(subject_ids) %>%
   summarise(n_class.ids = n())
 
+# remove affected photos for photo-user-species (PUS) combination count data
+PUS_counts_out <- datameltedtar %>%
+  group_by(user_name, subject_ids) %>%
+  filter(n() != 3)
 
+# output two datasets, i.e., PUS_counts_out and mark by mark data with no zeros (positive_data)
+write.csv(x = PUS_counts_out, file = "PUS_counts_level2.csv")
+write.csv(x = positive_data, file = "Positive_marks_level2.csv")
+
+#############################################################################################
 ##### agreement among users; the key idea is to evaluate how consistently users count the same number of fish of a given species within each photo.
 # Step 1: Count number of fish of each species per user per photo
 species_counts <- data_out %>%
