@@ -29,7 +29,7 @@ Positives_marks <- rbind(Positives_level2,Positives_level3,Positives_level4,Posi
 
 
 # Show structure
-glimpse(PUS_counts_out)
+head(PUS_counts_out)
 ```
 
 ## 🧪 Flattened Data Summary and Visulization 
@@ -348,4 +348,16 @@ ggplot(compare_data, aes(x = mode_count, y = n_high_conf_clusters)) +
   theme(strip.text = element_text(face = "bold"))
 
 ```
+
+
+```{r DBSCAN}
+rmarkdown::render("analysis_report.Rmd")
+```
+
+
+
+
+
+
+
 
