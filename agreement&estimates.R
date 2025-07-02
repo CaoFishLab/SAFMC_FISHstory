@@ -1,5 +1,7 @@
 
 rm(list = ls())
+librarian::shelf(dplyr,ggplot2,purrr,dbscan,forcats)
+
 # read in all levels data
 PUS_counts_level1 <- read.csv('PUS_counts_level1.csv')
 PUS_counts_level2 <- read.csv('PUS_counts_level2.csv')
@@ -14,9 +16,7 @@ PUS_counts_out <- rbind(PUS_counts_level2,PUS_counts_level3,PUS_counts_level4,PU
 Positives_marks <- rbind(Positives_level2,Positives_level3,Positives_level4,Positives_level1)
 
 head(PUS_counts_out)
-head(Positives_marks)
-
-####### examine and visulize the data
+####################################################################
 # count the number of unique users per photo per species
 users_per_photo <- PUS_counts_out %>%
   select(subject_ids, user_name, variable) %>%
@@ -34,7 +34,7 @@ ggplot(users_per_photo, aes(x = factor(n_users))) +
     y = "Number of Photos"
   ) +
   theme_minimal()
-
+####################################################################
 # Count unique photos per user
 photos_per_user <- PUS_counts_out %>%
   select(user_name, subject_ids) %>%
@@ -51,7 +51,7 @@ ggplot(photos_per_user, aes(x = n_photos)) +
     y = "Number of Users"
   ) +
   theme_minimal()
-
+####################################################################
 # Sum total fish counted per user per species
 fish_per_user_species <- PUS_counts_out %>%
   group_by(user_name, variable) %>%
@@ -78,7 +78,6 @@ ggplot(user_species_summary, aes(x = n_photos, y = total_fish_counted)) +
   geom_text(data = subset(user_species_summary, total_fish_counted > 500),
             aes(label = user_name), hjust = 1.1, vjust = 0.5, size = 3) +
   theme_minimal()
-
 
 #############################################################################################
 ##### agreement among users; the key idea is to evaluate how consistently users count the same number of fish of a given species within each photo.
@@ -142,19 +141,55 @@ species_stats <- mode_agreement_summary %>%
     label = paste0("Mean ± SD:\n", round(mean_agreement, 1), " ± ", round(sd_agreement, 1), "%")
   )
 
+####################################################################
+species_stats2 <- mode_agreement_summary %>%
+  group_by(variable, response_type) %>%
+  summarise(
+    mean_agreement = mean(agreement_percent, na.rm = TRUE),
+    sd_agreement = sd(agreement_percent, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0(round(mean_agreement, 1), " ± ", round(sd_agreement, 1), "%")
+  )
+print(species_stats2)
+ggplot(species_stats2, aes(x = response_type, y = mean_agreement, fill = response_type)) +
+  geom_col(position = "dodge", width = 0.6) +
+  geom_errorbar(
+    aes(ymin = mean_agreement - sd_agreement, ymax = mean_agreement + sd_agreement),
+    width = 0.2,
+    position = position_dodge(width = 0.6)
+  ) +
+  geom_text(
+    aes(label = label),
+    position = position_dodge(width = 0.6),
+    vjust = -0.5,  # adjust for spacing above the bar
+    size = 3
+  ) +
+  facet_wrap(~ variable) +
+  scale_fill_manual(
+    values = c("Positive" = "#1b9e77", "Zero" = "#d9d9d9")  # custom colors
+  ) +
+  labs(
+    title = "Mean ± SD of Agreement Percent by Species and Response Type",
+    x = "Response Type",
+    y = "Agreement Percentage"
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold"))
+
+####################################################################
 # Reorder variable so "Fish" and "People" are last
 mode_agreement_summary$variable <- forcats::fct_relevel(
   mode_agreement_summary$variable,
   setdiff(unique(mode_agreement_summary$variable), c("Fish", "People")),
   "Fish", "People"
 )
-
 # Also reorder species_stats to match (if used in facet-related geoms)
 species_stats$variable <- factor(
   species_stats$variable,
   levels = levels(mode_agreement_summary$variable)
 )
-
 ggplot(mode_agreement_summary, aes(x = agreement_percent, fill = response_type)) +
   geom_histogram(
     binwidth = 5, 
@@ -189,7 +224,7 @@ ggplot(mode_agreement_summary, aes(x = agreement_percent, fill = response_type))
     strip.text = element_text(face = "bold"),
     legend.position = "bottom"
   )
-
+####################################################################
 # Merge the stats 
 agreement_stats_more <- left_join(agreement_stats, mode_agreement_summary,
                                   by = c("subject_ids", "variable"))
@@ -203,8 +238,7 @@ ggplot(agreement_stats_more, aes(x = variable, y = sd_count)) +
   ) +
   theme_minimal() +
   coord_flip()
-
-
+####################################################################
 photo_level_counts_long <- agreement_stats_more %>%
   select(subject_ids, variable, mean_count, median_count, mode_value) %>%
   pivot_longer(
@@ -212,7 +246,6 @@ photo_level_counts_long <- agreement_stats_more %>%
     names_to = "statistic",
     values_to = "count"
   )
-
 ggplot(photo_level_counts_long, aes(x = statistic, y = count, fill = statistic)) +
   geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
   facet_wrap(~ variable, scales = "free_y") +
@@ -223,6 +256,183 @@ ggplot(photo_level_counts_long, aes(x = statistic, y = count, fill = statistic))
   ) +
   theme_minimal() +
   theme(legend.position = "none")
+
+##################################################################
+################## DBSCAN clustering analysis ####################
+### Density-Based Spatial Clustering of Applications with Noise ##
+##################################################################
+head(Positives_marks)
+# Parameters for DBSCAN
+eps <- 8      # Distance threshold in coordinate units
+minPts <- 2    # Minimum number of marks to form a cluster
+
+# Apply DBSCAN clustering by subject_ids and tool_label
+clustered_data <- Positives_marks %>%
+  filter(!is.na(xcoord), !is.na(ycoord), !is.na(tool_label)) %>%
+  group_by(subject_ids, tool_label) %>%
+  group_split() %>%
+  map_dfr(function(df) {
+    coords <- df %>% select(xcoord, ycoord)
+    
+    # Handle cases with too few marks to form a cluster
+    if (nrow(coords) < minPts) {
+      df$cluster_id <- NA
+      return(df)
+    }
+    # Run DBSCAN
+    clustering <- dbscan(coords, eps = eps, minPts = minPts)
+    # Add cluster ID (0 = noise)
+    df$cluster_id <- clustering$cluster
+    df
+  })
+
+###################################################################
+# Example: visualize one photo (change subject_ids to your target photo and select species)
+ggplot(filter(clustered_data, subject_ids == "41136326", tool_label=='Fish'), aes(x = xcoord, y = ycoord, color = factor(cluster_id))) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  scale_color_viridis_d(na.value = "gray80") +
+  labs(title = "Clusters for Subject", color = "Cluster") +
+  coord_fixed() +
+  theme_minimal()
+
+# calculate the mean x/y coordinates for each cluster (excluding noise) by subject_ids, tool_label, and cluster_id
+centroids <- clustered_data %>%
+  filter(!is.na(cluster_id)) %>%
+  group_by(subject_ids, tool_label, cluster_id) %>%
+  summarise(
+    centroid_x = mean(xcoord),
+    centroid_y = mean(ycoord),
+    .groups = "drop"
+  )
+
+photo_id <- 100502474
+species <- "Fish"
+
+photo_data <- clustered_data %>%
+  filter(subject_ids == photo_id, tool_label == species)
+
+photo_centroids <- centroids %>%
+  filter(subject_ids == photo_id, tool_label == species)
+
+ggplot(photo_data, aes(x = xcoord, y = ycoord, color = factor(cluster_id))) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  geom_point(
+    data = photo_centroids,
+    aes(x = centroid_x, y = centroid_y),
+    shape = 4, size = 4, color = "black", stroke = 1.2,
+    inherit.aes = FALSE
+  ) +
+  geom_text(
+    data = photo_centroids,
+    aes(x = centroid_x, y = centroid_y, label = cluster_id),
+    inherit.aes = FALSE,
+    size = 3.5, vjust = -1, fontface = "bold", color = "black"
+  ) +
+  scale_color_viridis_d(na.value = "gray80", name = "Cluster ID") +
+  labs(
+    title = paste("Clusters for", species, "in Photo", photo_id),
+    x = "X Coordinate",
+    y = "Y Coordinate"
+  ) +
+  coord_fixed() +
+  theme_minimal()
+###################################################################
+# Count Number of agreement clusters per photo and species
+# how many unique users contributed marks to each cluster
+cluster_summary <- clustered_data %>%
+  filter(!is.na(cluster_id), cluster_id > 0) %>%  # Keep valid clusters only (exclude noise)
+  group_by(subject_ids, tool_label, cluster_id) %>%
+  summarise(
+    n_users = n_distinct(user_name),              # Number of unique users per cluster
+    .groups = "drop"
+  )
+
+# Filter clusters with strong agreement (e.g., ≥ 50% agreement)
+user_totals <- clustered_data %>%
+  distinct(subject_ids, tool_label, user_name) %>%
+  count(subject_ids, tool_label, name = "total_users")
+
+high_confidence_clusters <- cluster_summary %>%
+  left_join(user_totals, by = c("subject_ids", "tool_label")) %>%
+  mutate(user_agreement = n_users / total_users) %>%
+  filter(user_agreement >= 0.5)  # keep clusters marked by ≥50% of users
+
+# How many strong clusters per photo/species?
+n_cluster_high <- high_confidence_clusters %>%
+  group_by(subject_ids, tool_label) %>%     # per photo and species
+  summarise(
+    n_high_conf_clusters = n_distinct(cluster_id),   # how many clusters met ≥ 50% agreement
+    max_agreement_users = max(n_users),              # largest number of users agreeing on any single cluster
+    .groups = "drop"
+  ) %>%
+  arrange(desc(max_agreement_users))        # rank by strength of top cluster
+
+high_confidence_clusters %>%
+  group_by(subject_ids, tool_label) %>%
+  summarise(n_high_conf_clusters = n_distinct(cluster_id), .groups = "drop") %>%
+  ggplot(aes(x = fct_reorder(tool_label, n_high_conf_clusters, .fun = median), 
+             y = n_high_conf_clusters, 
+             fill = tool_label)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(guide = "none") +
+  labs(
+    title = "Distribution of High-Confidence Clusters per Species",
+    x = "Species (ordered by median # clusters)",
+    y = "# High-Confidence Clusters (≥50% user agreement)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Total clusters per photo and species
+total_clusters <- clustered_data %>%
+  filter(!is.na(cluster_id), cluster_id > 0) %>%
+  distinct(subject_ids, tool_label, cluster_id) %>%
+  count(subject_ids, tool_label, name = "total_clusters")
+
+cluster_proportions <- left_join(n_cluster_high, total_clusters,
+                                 by = c("subject_ids", "tool_label")) %>%
+  mutate(prop_high_conf_clusters = n_high_conf_clusters / total_clusters)
+
+ggplot(cluster_proportions, aes(x = tool_label, y = prop_high_conf_clusters)) +
+  geom_boxplot(fill = "#4daf4a", alpha = 0.7) +
+  labs(
+    title = "Proportion of High-Confidence Clusters per Species",
+    x = "Species",
+    y = "Proportion of Clusters (≥50% user agreement)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+##### compare mode estimate with number of high-confidence cluster
+
+mode_positive <- mode_agreement_summary %>%
+  filter(mode_value > 0)
+names(mode_positive)[2] <- 'tool_label'
+  
+compare_data <- left_join(n_cluster_high, mode_positive,
+                          by = c("subject_ids", "tool_label"))
+
+compare_data_clean <- compare_data %>%
+  filter(!is.na(n_high_conf_clusters), !is.na(mode_value))
+
+ggplot(compare_data, aes(x = mode_count, y = n_high_conf_clusters)) +
+  geom_point(alpha = 0.7, size = 2.5, color = "#1f78b4") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray30") +
+  facet_wrap(~ tool_label) +
+  labs(
+    title = "High-Confidence Clusters vs. Mode Count",
+    x = "Mode Count",
+    y = "# High-Confidence Clusters"
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold"))
+
+
+
+
+
+
+
 
 
 
