@@ -174,8 +174,8 @@ PUS_counts_out %>%
   filter(is.na(value))
 
 # output two datasets, i.e., PUS_counts_out and mark by mark data with no zeros (positive_data)
-#write.csv(x = PUS_counts_out, file = "PUS_counts_level2.csv")
-#write.csv(x = positive_data, file = "Positive_marks_level2.csv")
+write.csv(x = PUS_counts_out, file = "PUS_counts_level2.csv")
+write.csv(x = positive_data, file = "Positive_marks_level2.csv")
 
 ####### examine and visulize the data
 # count the number of unique users per photo
