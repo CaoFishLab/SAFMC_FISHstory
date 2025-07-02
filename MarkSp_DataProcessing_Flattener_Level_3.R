@@ -10,20 +10,11 @@
 ##REMEMBER - DO NOT OPEN THE SPREADSHEET AFTER DOWNLOAD, DRAG IT TO THE FILE FOLDER AND RUN THE CODE! 
 rm(list = ls())
 ###### REMEMBER TO CHANGE THE DIRECTORY #############
-
-setwd("/Users/jcao22/Library/CloudStorage/GoogleDrive-souketu@gmail.com/My Drive/WORK_NCSU/Research_NCSU_active/FISHstory_Materials_Jie/Zooniverse/Alex_Files/Fishstory/Zooniverse_Results")
+#setwd("/Users/jcao22/Library/CloudStorage/GoogleDrive-souketu@gmail.com/My Drive/WORK_NCSU/Research_NCSU_active/FISHstory_Materials_Jie/Zooniverse/Alex_Files/Fishstory/Zooniverse_Results")
 
 #devtools::install_github("sailthru/tidyjson")
 
-library(tidyjson)
-library(magrittr)
-library(jsonlite)
-library(dplyr)
-library(stringr)
-library(tidyr)
-library(roperators)
-library(lubridate)
-library(ggplot2)
+librarian::shelf(tidyjson,magrittr,jsonlite,dplyr,stringr,tidyr,roperators,lubridate,ggplot2,reshape2)
 
 source("Zoo_Functions.R")
 
