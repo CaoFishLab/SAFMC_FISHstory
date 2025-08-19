@@ -133,6 +133,13 @@ datameltedtar <- datameltedtar %>%
 positive_data <- cleaned_data %>% 
   filter(!is.na(tool_label))
 
+########################################################################
+# output positive level 3 photo ids
+level3_positive_photo_id <- unique(positive_data$subject_ids)
+length(level3_positive_photo_id)
+length(unique(datameltedtar$subject_ids))
+#write.csv(x = level3_positive_photo_id, file = "level3_positive_photo_id.csv")
+
 ######################################
 head(datameltedtar)
 head(positive_data)

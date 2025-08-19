@@ -126,11 +126,17 @@ positive_data <- cleaned_data %>%
 
 ########################################################################
 # output sailfish photo ids
-#sailfish_photo_list <- positive_data %>%
-#  filter(tool_label=='Sailfish')
+sailfish_photo_list <- positive_data %>%
+  filter(tool_label=='Sailfish')
 
-#sailfish_photo_ids <- unique(sailfish_photo_list$subject_ids)
+sailfish_photo_ids <- unique(sailfish_photo_list$subject_ids)
 #write.csv(x = sailfish_photo_ids, file = "sailfish_photo_ids.csv")
+
+# output positive level 2 photo ids
+level2_positive_photo_id <- unique(positive_data$subject_ids)
+length(level2_positive_photo_id)
+length(unique(datameltedtar$subject_ids))
+#write.csv(x = level2_positive_photo_id, file = "level2_positive_photo_id.csv")
 
 ######################################
 head(datameltedtar)
